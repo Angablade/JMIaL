@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Jellyfin Music Image and Lyrics": {
+      "commandName": "Project",
+      "commandLineArgs": "-h"
+    }
+  }
+}
