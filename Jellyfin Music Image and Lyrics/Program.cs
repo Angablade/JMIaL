@@ -7,6 +7,23 @@ using System.Drawing.Imaging;
 
 class Program
 {
+    static ILyricsProvider CreateInstance(string className)
+    {
+        try
+        {
+            Type type = Type.GetType(className);
+            if (type != null && typeof(ILyricsProvider).IsAssignableFrom(type))
+            {
+                return Activator.CreateInstance(type) as ILyricsProvider;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error creating an instance of the specified class: {ex.Message}");
+        }
+
+        return null;
+    }
 
     static void Main(string[] args)
     {
@@ -16,10 +33,11 @@ class Program
         bool overwriteall = false;
         bool verbose = false;
         string query = "album art";
-        string aquery = "artist";
-        int timeoutval = 0;
+        string aquery = "artist photo";
+        int timeoutval = 500;
         bool showHelp = false;
         bool silent = false;
+        ILyricsProvider lyricsProvider = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -60,6 +78,25 @@ class Program
                     overwriteall = true;
                     break;
 
+                case "-z": //The flag to set to select the lyrics engine
+                case "-zone":
+                    if (i + 1 < args.Length)
+                    {
+                        lyricsProvider = CreateInstance("JMIAL."+args[i + 1].Replace(" ",""));
+                        if(lyricsProvider == null)
+                        {
+                            lyricsProvider = new AZLyrics();
+                        }
+                        i++;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Error: Missing zone selection after -z or -zone flag.");
+                        return;
+                    }
+
+                    
+                    break;
                 case "-v":  //The flag to set to enter verbose logging mode.
                 case "-verbose":
                     verbose = true;
@@ -118,49 +155,51 @@ class Program
                     return;
             }
         }
-        if (silent != true) {
-            Console.WriteLine("************************************************"); 
-            Console.WriteLine("*     .---.                                    *"); 
-            Console.WriteLine("*     |   |                              .---. *"); 
-            Console.WriteLine("*     '---' __  __   ___   .--.          |   | *"); 
-            Console.WriteLine("*     .---.|  |/  `.'   `. |__|          |   | *"); 
-            Console.WriteLine("*     |   ||   .-.  .-.   '.--.          |   | *"); 
-            Console.WriteLine("*     |   ||  |  |  |  |  ||  |   __     |   | *"); 
-            Console.WriteLine("*     |   ||  |  |  |  |  ||  | .:--.'.  |   | *"); 
-            Console.WriteLine("*     |   ||  |  |  |  |  ||  |/ |   \\|  |   | *"); 
-            Console.WriteLine("*     |   ||  |  |  |  |  ||  |`\" __ ||  |   | *"); 
-            Console.WriteLine("*     |   ||__|  |__|  |__||__| .'.''| | |   | *"); 
-            Console.WriteLine("*  __.'   '                    / /   | |_`---' *"); 
-            Console.WriteLine("* |      '                     \\ \\._,\\'/       *"); 
-            Console.WriteLine("* |____.'                       `--'  `\"`      *"); 
-            Console.WriteLine("************************************************"); 
-            Console.WriteLine("*   The Jellyfin Music Images and lyrics tool  *"); 
-            Console.WriteLine("************************************************"); 
+        if (!silent)
+        {
+            Console.WriteLine("************************************************");
+            Console.WriteLine("*     .---.                                    *");
+            Console.WriteLine("*     |   |                              .---. *");
+            Console.WriteLine("*     '---' __  __   ___   .--.          |   | *");
+            Console.WriteLine("*     .---.|  |/  `.'   `. |__|          |   | *");
+            Console.WriteLine("*     |   ||   .-.  .-.   '.--.          |   | *");
+            Console.WriteLine("*     |   ||  |  |  |  |  ||  |   __     |   | *");
+            Console.WriteLine("*     |   ||  |  |  |  |  ||  | .:--.'.  |   | *");
+            Console.WriteLine("*     |   ||  |  |  |  |  ||  |/ |   \\|  |   | *");
+            Console.WriteLine("*     |   ||  |  |  |  |  ||  |`\" __ ||  |   | *");
+            Console.WriteLine("*     |   ||__|  |__|  |__||__| .'.''| | |   | *");
+            Console.WriteLine("*  __.'   '                    / /   | |_`---' *");
+            Console.WriteLine("* |      '                     \\ \\._,\\'/       *");
+            Console.WriteLine("* |____.'                       `--'  `\"`      *");
+            Console.WriteLine("************************************************");
+            Console.WriteLine("*   The Jellyfin Music Images and lyrics tool  *");
+            Console.WriteLine("************************************************");
             Console.WriteLine("|");
-            if(showHelp == true)
+            if (showHelp == true)
             {
                 DisplayHelp(silent);
                 return;
             }
-            
-        
-            Console.WriteLine($"|       Directory : {directory ?? "Not specified"}"); 
-            Console.WriteLine($"| Include Artists : {includeArtist}"); 
-            Console.WriteLine($"|  Include Lyrics : {includeLyrics}"); 
-            Console.WriteLine($"| Overwrite files : {overwriteall}"); 
+
+
+            Console.WriteLine($"|       Directory : {directory ?? "Not specified"}");
+            Console.WriteLine($"| Include Artists : {includeArtist}");
+            Console.WriteLine($"|  Include Lyrics : {includeLyrics}");
+            Console.WriteLine($"| Overwrite files : {overwriteall}");
             if (verbose == true)
             {
-                Console.WriteLine($"|    Verbose mode : {verbose}"); 
-                Console.WriteLine($"|  Album subquery : {query}"); 
-                Console.WriteLine($"| Artist subquery : {aquery}"); 
-                Console.WriteLine($"|  Timeout length : {timeoutval}"); 
+                Console.WriteLine($"|    Verbose mode : {verbose}");
+                Console.WriteLine($"|  Album subquery : {query}");
+                Console.WriteLine($"| Artist subquery : {aquery}");
+                Console.WriteLine($"|  Timeout length : {timeoutval}");
+                Console.WriteLine($"|       Zone Name : {lyricsProvider.GetProviderName()}");
             }
             Console.WriteLine("|");
         };
 
         if (string.IsNullOrEmpty(directory))
         {
-            if (silent != true) { Console.WriteLine("| Error: Directory not specified. Exiting program."); };
+            if (!silent) { Console.WriteLine("| Error: Directory not specified. Exiting program."); };
             Environment.Exit(1);
         }
 
@@ -170,12 +209,12 @@ class Program
     static void ScanAndExecute(string currentPath, Boolean includelyrics, Boolean includeartists, Boolean overwrite, bool verbose, string query, string aquery, int tout, bool silent)
     {
         AlbumArt art = new AlbumArt();
-        Lyrics Lyr = new Lyrics();
+        AZLyrics Lyr = new AZLyrics();
 
         string[] Folders = Directory.GetDirectories(currentPath);
         foreach (var Folder in Folders)
         {
-            if (silent != true) { Console.Write("|->" + Folder); };
+            if (!silent) { Console.Write("|->" + Folder); };
             string[] subFolders = Directory.GetDirectories(Folder);
 
             if (includeartists)
@@ -186,25 +225,24 @@ class Program
 
                     if (!overwrite && !File.Exists(folderPath))
                     {
-                        if (verbose == true) { if (silent != true) { Console.Write(" {Search:" + Folder.Substring(currentPath.Length + 1) + "+" + aquery + "} "); }; };
+                        if (verbose == true) { if (!silent) { Console.Write(" {Search:" + Folder.Substring(currentPath.Length + 1) + "+" + aquery + "} "); }; };
                         DownloadFileAsync(art.GetAlbumArtUrl(Folder.Substring(currentPath.Length + 1) + "+" + aquery), folderPath, tout).Wait();
                     }
                     else if (overwrite)
                     {
-                        if (verbose == true) { if (silent != true) { Console.Write(" {Search:" + Folder.Substring(currentPath.Length + 1) + "+" + aquery + "} "); }; };
+                        if (verbose == true) { if (!silent) { Console.Write(" {Search:" + Folder.Substring(currentPath.Length + 1) + "+" + aquery + "} "); }; };
                         DownloadFileAsync(art.GetAlbumArtUrl(Folder.Substring(currentPath.Length + 1) + "+" + aquery), folderPath, tout).Wait();
                     }
 
-                    if (silent != true) { Console.WriteLine(" [OK]"); };
+                    if (!silent) { Console.WriteLine(" [OK]"); };
                 }
                 catch (Exception)
                 {
-                    if (silent != true) { Console.WriteLine(" [X]"); };
+                    if (!silent) { Console.WriteLine(" [X]"); };
                 }
             }
-            else
-            {
-                if (silent != true)
+
+                if (!silent)
                 {
                     Console.WriteLine("");
                 }
@@ -215,22 +253,22 @@ class Program
                     try
                     {
                         string filePath = Path.Combine(subFolder, "cover.jpg");
-                        if (silent != true) { Console.Write("|   |->" + subFolder.Substring(Folder.Length + 1)); };
+                        if (!silent) { Console.Write("|   |->" + subFolder.Substring(Folder.Length + 1)); };
                         if (!overwrite && !File.Exists(filePath))
                         {
-                            if (verbose == true) { if (silent != true) { Console.Write(" {Search:" + subFolder.Substring(currentPath.Length + 1).Replace("\\", "+").Replace("/", "+") + "+" + query + "} "); }; };
+                            if (verbose == true) { if (!silent) { Console.Write(" {Search:" + subFolder.Substring(currentPath.Length + 1).Replace("\\", "+").Replace("/", "+") + "+" + query + "} "); }; };
                             DownloadFileAsync(art.GetAlbumArtUrl(subFolder.Substring(currentPath.Length + 1).Replace("\\", "+").Replace("/", "+") + "+" + query), Path.Combine(subFolder, "cover.jpg"), tout).Wait();
                         }
                         else if (overwrite)
                         {
-                            if (verbose == true) { if (silent != true) { Console.Write(" {Search:" + subFolder.Substring(currentPath.Length + 1).Replace("\\", "+").Replace("/", "+") + "+" + query + "} "); }; };
+                            if (verbose == true) { if (!silent) { Console.Write(" {Search:" + subFolder.Substring(currentPath.Length + 1).Replace("\\", "+").Replace("/", "+") + "+" + query + "} "); }; };
                             DownloadFileAsync(art.GetAlbumArtUrl(subFolder.Substring(currentPath.Length + 1).Replace("\\", "+").Replace("/", "+") + "+" + query), Path.Combine(subFolder, "cover.jpg"), tout).Wait();
                         }
-                        if (silent != true) { Console.WriteLine(" [OK]"); };
+                        if (!silent) { Console.WriteLine(" [OK]"); };
                     }
                     catch (Exception)
                     {
-                        if (silent != true) { Console.WriteLine(" [X]"); };
+                        if (!silent) { Console.WriteLine(" [X]"); };
                     }
 
                     if (includelyrics == true)
@@ -244,7 +282,7 @@ class Program
                                 {
                                     try
                                     {
-                                        if (silent != true)
+                                        if (!silent)
                                         {
                                             Console.Write("|   |   |->" + file.Substring(subFolder.Length + 1));
                                             AudioTagReader.AudioTags ptags = new AudioTagReader.AudioTags();
@@ -253,12 +291,12 @@ class Program
                                             {
                                                 if (verbose == true)
                                                 {
-                                                    if (silent != true) { Console.Write(" {Search:" + ptags.Artist + " - " + ptags.Title + "} "); };
+                                                    if (!silent) { Console.Write(" {Search:" + ptags.Artist + " - " + ptags.Title + "} "); };
                                                     using (StreamWriter writer = new StreamWriter(Path.ChangeExtension(file, ".lyrs")))
                                                     {
-                                                        writer.Write(Lyr.GetLyrics(ptags.Title, ptags.Artist, Lyrics.Returner.Text, false));
+                                                        writer.Write(Lyr.GetLyrics(ptags.Title, ptags.Artist, LyricsHelper.Returner.Text));
                                                     }
-                                                    if (silent != true)
+                                                    if (!silent)
                                                     {
                                                         Console.WriteLine(" [OK]");
                                                     };
@@ -268,13 +306,13 @@ class Program
                                             {
                                                 if (verbose == true)
                                                 {
-                                                    if (silent != true)
+                                                    if (!silent)
                                                     {
                                                         Console.Write(" {File contains no tags!} ");
                                                     };
                                                 };
 
-                                                if (silent != true)
+                                                if (!silent)
                                                 {
                                                     Console.WriteLine(" [X]");
                                                 };
@@ -283,7 +321,7 @@ class Program
                                     }
                                     catch (Exception)
                                     {
-                                        if (silent != true)
+                                        if (!silent)
                                         {
                                             Console.WriteLine(" [X]");
                                         };
@@ -292,15 +330,14 @@ class Program
                             }
                         }
 
-                        if (silent != true)
+                        if (!silent)
                         {
                             Console.WriteLine("|   |");
                         };
                     }
                 }
-                if (silent != true) { Console.WriteLine("|"); };
-            }
-        } 
+               if (!silent) { Console.WriteLine("|"); };  
+        }
     }
 
     static bool HasAudioExtension(string filePath)
@@ -318,7 +355,6 @@ class Program
 
     static async Task DownloadFileAsync(string fileUrl, string savePath, int timeoutval)
     {
-        _ = Task.Delay(timeoutval);
         using (HttpClient client = new HttpClient())
         {
             using (HttpResponseMessage response = await client.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead))
@@ -333,22 +369,24 @@ class Program
                 }
             }
         }
-        Task.Delay(timeoutval);
+        Thread.Sleep(timeoutval);
     }
 
     static void DisplayHelp(bool silent)
     {
-        if (silent != true)
+        if (!silent)
         {
-            Console.WriteLine("|-> -?, -h, -help   Display this help message"); };
-            Console.WriteLine("|-> -d, -dir        Lidarr based media library location on disk that is specified."); 
-            Console.WriteLine("|-> -a, -artist     Include artist photo downloads when scanning the library."); 
+            Console.WriteLine("|-> -?, -h, -help   Display this help message");
+            Console.WriteLine("|-> -d, -dir        Lidarr library location on disk specified. Example: -d C:\\Music or -d /mnt/sd0/Music");
+            Console.WriteLine("|-> -a, -artist     Include artist photo downloads when scanning the library.");
             Console.WriteLine("|-> -l, -lyrics     Download lyrics for the music in the library.");
             Console.WriteLine("|-> -o, -overwrite  Overwrite all files instead of skipping existing files.");
+            Console.WriteLine("|-> -z, -zone       Select the lyrics engine. (AZLyrics, GeniusLyrics, MusixMatch, LyricsCom, Default: AZLyrics)");
             Console.WriteLine("|-> -v, -verbose    Enter verbose logging mode.");
-            Console.WriteLine("|-> -q, -query      Search query for album art (default: 'album art').");
-            Console.WriteLine("|-> -p, -pquery     Search query for artist photo (default: 'artist').");
-            Console.WriteLine("|-> -t, -timeout    Timeout interval between each image download.");
+            Console.WriteLine("|-> -q, -query      Search query for album art (default: 'album art'). Example: -q cover art");
+            Console.WriteLine("|-> -p, -pquery     Search query for artist photo (default: 'artist'). Example: -p poster");
+            Console.WriteLine("|-> -t, -timeout    Timeout between image downloads in milliseconds (default: 500). Example: -t 1000");
+            Console.WriteLine("|-> -s, -silent     Runs the application in silent mode, with no output.");
         }
     }
-
+}

@@ -2,7 +2,7 @@
   "profiles": {
     "Jellyfin Music Image and Lyrics": {
       "commandName": "Project",
-      "commandLineArgs": "-h"
+      "commandLineArgs": "-v\r\n-z MusixMatch\r\n-d N:\\Downloads\\Music\r\n-t 3000\r\n-a\r\n-l\r\n-o"
     }
   }
 }
